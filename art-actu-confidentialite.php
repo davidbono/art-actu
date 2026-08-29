@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+// Art & Expos — Rennes & Ille-et-Vilaine
+// Copyright (C) 2026 David Legoupil — licensed under the GNU GPL v3 or
+// later. See the LICENSE file at the root of this repository.
+
 // Public legal page, same "no gate" reasoning as art-actu.php itself:
 // linked from its footer, meant to be readable by any visitor. Filename
 // prefixed "art-actu-" like art-actu-sites.txt since penloup.eu's docroot

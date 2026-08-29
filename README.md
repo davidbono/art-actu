@@ -31,3 +31,8 @@ Accessible sur [penloup.eu/art-actu.php](https://penloup.eu/art-actu.php).
   pour le géocodage.
 - `exhibitions.db`, `geocode_cache.json` *(non versionnés)* — données
   générées automatiquement, reconstruites à chaque exécution du workflow.
+
+## Licence
+
+Ce projet est distribué sous licence [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html)
+ou toute version ultérieure — voir le fichier [`LICENSE`](LICENSE).

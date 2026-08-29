@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+// Art & Expos — Rennes & Ille-et-Vilaine
+// Copyright (C) 2026 David Legoupil — licensed under the GNU GPL v3 or
+// later. See the LICENSE file at the root of this repository.
+
 // Public legal page, same "no gate" reasoning as art-actu.php itself.
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: public, max-age=3600');
@@ -55,10 +59,13 @@ header('Cache-Control: public, max-age=3600');
   contenu, leur disponibilité ou leurs propres conditions d'utilisation.</p>
 
   <h2>Propriété intellectuelle</h2>
-  <p>Le code et la mise en forme propres à ce site sont la propriété de leur auteur. Les noms,
-  visuels et contenus relatifs à chaque exposition ou événement restent la propriété de leurs
-  lieux culturels et artistes respectifs ; leur mention ici a une vocation purement informative
-  et promotionnelle, sans revendication d'aucune sorte sur ces contenus.</p>
+  <p>Le code source de ce site est publié sous licence
+  <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GNU GPL v3</a>
+  (ou toute version ultérieure), disponible sur
+  <a href="https://github.com/davidbono/art-actu" target="_blank" rel="noopener">GitHub</a>.
+  Les noms, visuels et contenus relatifs à chaque exposition ou événement restent la propriété
+  de leurs lieux culturels et artistes respectifs ; leur mention ici a une vocation purement
+  informative et promotionnelle, sans revendication d'aucune sorte sur ces contenus.</p>
   <p>Les fonds de carte sont fournis par
   <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>,
   © les contributeurs d'OpenStreetMap, sous licence
