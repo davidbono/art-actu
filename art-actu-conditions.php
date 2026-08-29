@@ -72,7 +72,7 @@ header('Cache-Control: public, max-age=3600');
   <p>Les présentes conditions sont soumises au droit français.</p>
 
   <h2>Contact</h2>
-  <p><a href="mailto:david.legoupil@gmail.com">david.legoupil@gmail.com</a></p>
+  <p><a href="mailto:contact@penloup.eu">contact@penloup.eu</a></p>
 </main>
 <footer>© <?= date('Y') ?> David Legoupil — <a href="/art-actu-confidentialite.php">Politique de confidentialité</a></footer>
 </body>

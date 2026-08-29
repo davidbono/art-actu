@@ -68,7 +68,7 @@ header('Cache-Control: public, max-age=3600');
 
   <h2>Contact</h2>
   <p>Pour toute question relative à cette politique de confidentialité :
-  <a href="mailto:david.legoupil@gmail.com">david.legoupil@gmail.com</a>.</p>
+  <a href="mailto:contact@penloup.eu">contact@penloup.eu</a>.</p>
 </main>
 <footer>© <?= date('Y') ?> David Legoupil — <a href="/art-actu-conditions.php">Conditions d'utilisation</a></footer>
 </body>
