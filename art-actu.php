@@ -654,6 +654,9 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   .legend .chip { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .legend .chip svg { width: 11px; height: 11px; stroke: #fff; }
   .panel-bg { background: #0B0B0E; }
+  .site-footer { text-align: center; padding: 16px 22px 28px; color: #8C8577; font-size: 0.78rem; border-top: 1px solid #262521; }
+  .site-footer a { color: #B7B2A8; }
+  .site-footer a:hover { color: #E8C468; }
   .panel { padding: 28px 22px 48px; max-width: 900px; margin: 0 auto; }
   .panel h2 { font-size: 1rem; margin: 26px 0 12px; font-weight: 600; color: #F4F1EB; }
   .panel .empty { color: #B7B2A8; }
@@ -746,6 +749,11 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   <?php endforeach; ?>
 <?php endif; ?>
 </div>
+<footer class="site-footer">
+  © <?= date('Y') ?> David Legoupil —
+  <a href="/art-actu-confidentialite.php">Confidentialité</a> ·
+  <a href="/art-actu-conditions.php">Conditions d'utilisation</a>
+</footer>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
