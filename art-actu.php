@@ -233,6 +233,32 @@ function normalize_venue_name(string $venue): string
     return strtolower($transliterated !== false ? $transliterated : $venue);
 }
 
+// Transliterated/lowercased but NOT stripped of sub-location detail —
+// used to find a known venue anywhere in the string, since the AI
+// sometimes writes "sub-location - main venue" (e.g. "Salle Anita Conti -
+// Les Champs Libres") rather than "main venue - sub-location", and
+// strip_venue_detail() alone would keep the wrong (sub-location) half.
+function normalize_full_venue(string $venue): string
+{
+    $transliterated = @iconv('UTF-8', 'ASCII//TRANSLIT', $venue);
+    return strtolower($transliterated !== false ? $transliterated : $venue);
+}
+
+function find_known_venue(string $venue): ?array
+{
+    $normalized = normalize_venue_name($venue);
+    if (isset(KNOWN_VENUES[$normalized])) {
+        return KNOWN_VENUES[$normalized];
+    }
+    $full = normalize_full_venue($venue);
+    foreach (KNOWN_VENUES as $key => $coords) {
+        if (str_contains($full, $key)) {
+            return $coords;
+        }
+    }
+    return null;
+}
+
 // Loose bounding box around Ille-et-Vilaine / nearby Brittany — used both
 // to bias Nominatim's own search and as a hard sanity check afterwards.
 // Vague venue text (e.g. "parcours en ville, depart variable") can make
@@ -289,11 +315,10 @@ function geocode_venue(string $venue, string $city, array $cache, string $contac
         return [$cache[$key], $cache];
     }
 
-    $normalized = normalize_venue_name($venue);
-    if (isset(KNOWN_VENUES[$normalized])) {
-        $coords = KNOWN_VENUES[$normalized];
-        $cache[$key] = $coords;
-        return [$coords, $cache];
+    $known = find_known_venue($venue);
+    if ($known !== null) {
+        $cache[$key] = $known;
+        return [$known, $cache];
     }
 
     $cleanVenue = strip_venue_detail($venue);
@@ -639,7 +664,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, "Segoe UI", Arial, sans-serif; background: #FAF7F2; color: #2E2B27; }
-  .hero { width: 100%; height: 200px; background: #0B0B0E; overflow: hidden; }
+  .hero { width: 100%; height: 160px; background: #0B0B0E; overflow: hidden; }
   .hero canvas { display: block; width: 100%; height: 100%; }
   .updated-below { margin: 0; padding: 10px 22px; font-size: 0.8rem; color: #B7B2A8; background: #0B0B0E; }
   .map-frame { background: #0B0B0E; padding: 0 10px; }
