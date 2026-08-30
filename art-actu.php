@@ -366,7 +366,34 @@ function get_db(string $path): PDO
         last_seen_at  TEXT NOT NULL
     )');
     $pdo->exec('CREATE TABLE IF NOT EXISTS meta (mkey TEXT PRIMARY KEY, mvalue TEXT)');
+    // Visitor counter: only a salted one-way hash of the IP is kept (never
+    // the IP itself), just to de-duplicate repeat visits into a "distinct
+    // visitors" count. See art-actu-confidentialite.php.
+    $pdo->exec('CREATE TABLE IF NOT EXISTS visitors (ip_hash TEXT PRIMARY KEY, first_seen_at TEXT NOT NULL)');
     return $pdo;
+}
+
+// True for real public internet addresses only — local/LAN/admin traffic
+// (127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16-31.x.x) is never counted as a
+// "visitor", it's just testing/admin access to the same server.
+function is_public_ip(string $ip): bool
+{
+    return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+}
+
+function record_visitor(PDO $pdo, string $salt, string $ip): void
+{
+    if (!is_public_ip($ip)) {
+        return;
+    }
+    $hash = hash('sha256', $salt . $ip);
+    $stmt = $pdo->prepare('INSERT OR IGNORE INTO visitors (ip_hash, first_seen_at) VALUES (?, ?)');
+    $stmt->execute([$hash, date(DATE_ATOM)]);
+}
+
+function count_visitors(PDO $pdo): int
+{
+    return (int) $pdo->query('SELECT COUNT(*) FROM visitors')->fetchColumn();
 }
 
 // Uses normalize_venue_name() (parenthetical/dash site detail stripped,
@@ -645,6 +672,9 @@ $pdo = get_db($DB_PATH);
 $exhibitions = db_all_exhibitions($pdo);
 $updatedAt = meta_get($pdo, 'updated_at');
 
+record_visitor($pdo, (string) $config['visitor_salt'], (string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+$visitorCount = count_visitors($pdo);
+
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache');
 
@@ -667,6 +697,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   .hero { width: 100%; height: 160px; background: #0B0B0E; overflow: hidden; }
   .hero canvas { display: block; width: 100%; height: 100%; }
   .updated-below { margin: 0; padding: 10px 22px; font-size: 0.8rem; color: #B7B2A8; background: #0B0B0E; }
+  .visitor-count { color: #8C8577; }
   .map-frame { background: #0B0B0E; padding: 0 10px; }
   #map { height: 42vh; min-height: 240px; max-height: 380px; width: 100%; background: #EDE9E1; }
   /* "Scandinavian" look applied as a CSS filter on the raw OpenStreetMap
@@ -748,7 +779,10 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
 <div id="map"></div>
 </div>
 
-<p class="updated-below"><?= $updatedAt ? 'Mis à jour le ' . htmlspecialchars(date('d/m/Y à H:i', strtotime($updatedAt))) : 'Pas encore de données' ?></p>
+<p class="updated-below">
+  <?= $updatedAt ? 'Mis à jour le ' . htmlspecialchars(date('d/m/Y à H:i', strtotime($updatedAt))) : 'Pas encore de données' ?>
+  <span class="visitor-count" title="Nombre de visiteurs distincts">· <?= number_format($visitorCount, 0, ',', ' ') ?> visiteur<?= $visitorCount > 1 ? 's' : '' ?></span>
+</p>
 
 <div class="legend" id="legend">
 <?php foreach (CATEGORIES as $key => $cat): ?>

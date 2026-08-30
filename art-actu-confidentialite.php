@@ -43,9 +43,14 @@ header('Cache-Control: public, max-age=3600');
   et d'Ille-et-Vilaine. Il ne demande aucune inscription et ne propose aucun compte utilisateur.</p>
 
   <h2>Données collectées</h2>
-  <p>Ce site ne collecte, ne stocke et ne vend aucune donnée personnelle de ses visiteurs.
-  Il ne dépose aucun cookie et ne contient aucun outil d'analyse d'audience (pas de Google
-  Analytics, Matomo ou équivalent).</p>
+  <p>Ce site ne collecte, ne stocke et ne vend aucune donnée personnelle identifiable de ses
+  visiteurs. Il ne dépose aucun cookie et ne contient aucun outil d'analyse d'audience (pas de
+  Google Analytics, Matomo ou équivalent).</p>
+  <p>Le compteur de visiteurs affiché sur la carte ne conserve jamais votre adresse IP : à
+  chaque visite, l'adresse IP est transformée de façon irréversible (hachage à sens unique avec
+  une clé secrète propre au serveur) avant d'être comparée aux visites déjà connues, uniquement
+  pour éviter de compter plusieurs fois la même personne. Il est impossible de retrouver une
+  adresse IP à partir des valeurs stockées.</p>
   <p>Le serveur qui héberge le site conserve, comme tout serveur web, des journaux techniques
   standard (adresse IP, horodatage, page demandée) à des fins de sécurité et de bon
   fonctionnement. Ces journaux ne sont ni analysés à des fins commerciales, ni transmis à des
