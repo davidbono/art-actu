@@ -69,6 +69,14 @@ header('Cache-Control: public, max-age=3600');
     lieux culturels concernés, qui disposent chacun de leur propre politique de confidentialité.</li>
   </ul>
 
+  <h2>Proposer un événement</h2>
+  <p>Le formulaire « + Proposer un événement » demande une adresse email afin de pouvoir vous
+  recontacter en cas de besoin (par exemple pour préciser une information avant publication).
+  Cette adresse n'est jamais affichée publiquement sur la carte ; elle n'est visible que dans
+  l'email de validation envoyé au responsable du site, et n'est utilisée à aucune autre fin.
+  Une proposition non validée (rejetée, ou jamais traitée) reste dans la base technique du site
+  mais n'apparaît jamais sur la carte publique.</p>
+
   <h2>Origine des informations affichées</h2>
   <p>Les expositions et événements affichés sont recherchés et résumés automatiquement à partir
   de sources publiques disponibles sur le web. Ces informations peuvent contenir des erreurs ou
