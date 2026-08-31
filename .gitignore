@@ -6,4 +6,13 @@ config.php
 exhibitions.db
 exhibitions.db-wal
 exhibitions.db-shm
+
+# Installed by `npm install` in scripts/ (see scripts/render-logo-pngs.js).
+scripts/node_modules
+scripts/package-lock.json
+
+# Rasterised from logos/*.svg by scripts/render-logo-pngs.js — regenerate
+# with `npm install && npm run render` inside scripts/ rather than
+# committing binary PNGs to the repo.
+logos-png/
 geocode_cache.json

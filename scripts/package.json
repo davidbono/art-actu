@@ -1,0 +1,11 @@
+{
+  "name": "art-actu-logo-render",
+  "private": true,
+  "description": "Rasterises ../logos/*.svg into ../logos-png/*.png (see render-logo-pngs.js)",
+  "scripts": {
+    "render": "node render-logo-pngs.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

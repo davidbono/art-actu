@@ -17,12 +17,13 @@ declare(strict_types=1);
 // fresh list of exhibitions each Saturday. Code lives outside
 // /srv/penloup/html on purpose since it's updated by n8n, not by hand.
 //
-// Icon set: hand-drawn 10x10 pixel-art sprites (see PIXEL_ICONS below),
-// single accent colour per category, defined once and reused via <use> —
-// that shared sprite + shared palette IS the graphic charter. Kept
-// separate from the newsletter's colour dots (see the n8n workflow's
-// "Construire newsletter + payload" node) since inline SVG is unreliable
-// in email clients; the two surfaces share the same hex colours instead.
+// Icon set: user-supplied SVG logos (/srv/art-actu/logos/*.svg), one per
+// category, rasterised once to PNG (white icon on a solid category-colour
+// circle) via scripts/render-logo-pngs.js and served statically from
+// /srv/art-actu/logos-png/ under the /art-actu-logos/ nginx alias. PNG
+// rather than inline SVG so the exact same files also work as <img> in
+// the newsletter email (see the n8n workflow's "Construire newsletter +
+// payload" node), where inline SVG isn't reliably supported.
 
 $CONFIG_PATH   = __DIR__ . '/config.php';
 $GEOCACHE_PATH = __DIR__ . '/geocode_cache.json';
@@ -49,123 +50,6 @@ const CATEGORIES = [
     'exposition'       => ['label' => 'Exposition',       'icon' => 'exposition',       'color' => '#A38F76'],
 ];
 const DEFAULT_CATEGORY = 'exposition';
-
-// Hand-drawn 10x10 pixel-art bitmaps for the category icons, one string
-// per row ('X' = filled cell). Rendered as a grid of <rect> (see
-// render_pixel_icon()) so they read as chunky 8-bit sprites, matching the
-// hero banner's pixel-art "ART" animation.
-const PIXEL_ICONS = [
-    'peinture' => [
-        '...XXXX...',
-        '.XXXXXXXX.',
-        'XXXXXXXXXX',
-        'XXX.XXX.XX',
-        'XX.XXXXX.X',
-        'XXXXXXXXXX',
-        'XXXXXXXXXX',
-        '.XXXXXXXX.',
-        '..XXXXXX..',
-        '....XX....',
-    ],
-    'sculpture' => [
-        '...XXXX...',
-        '..XXXXXX..',
-        '..XXXXXX..',
-        '...XXXX...',
-        '....XX....',
-        '...XXXX...',
-        '..XXXXXX..',
-        '.XXXXXXXX.',
-        'XXXXXXXXXX',
-        'XXXXXXXXXX',
-    ],
-    'photographie' => [
-        '...XX.....',
-        '.XXXXXXXX.',
-        'XXXXXXXXXX',
-        'XX.XXXX.XX',
-        'X.X....X.X',
-        'X.X....X.X',
-        'XX.XXXX.XX',
-        'XXXXXXXXXX',
-        'XXXXXXXXXX',
-        '..........',
-    ],
-    'arts_numeriques' => [
-        'XXXXXXXXXX',
-        'X........X',
-        'X.X.XX.X.X',
-        'X.XX..XX.X',
-        'X........X',
-        'X........X',
-        'XXXXXXXXXX',
-        '...XXXX...',
-        '...XXXX...',
-        '..XXXXXX..',
-    ],
-    'street_art' => [
-        '..XXXX....',
-        '.X....X...',
-        'XXXXXXXX..',
-        'X......X..',
-        'X.XXXX.X..',
-        'X.X..X.X..',
-        'X.XXXX.X..',
-        'X......X..',
-        'XXXXXXXX..',
-        '..........',
-    ],
-    'design' => [
-        'XXX.......',
-        '.XXX......',
-        '..XXX.....',
-        '...XXX....',
-        '....XXX...',
-        '.....XXX..',
-        '......XXX.',
-        '.......XXX',
-        '........X.',
-        '.........X',
-    ],
-    'spectacle_vivant' => [
-        '..XXXXXX..',
-        '.XXXXXXXX.',
-        'XXX.XX.XXX',
-        'XXXXXXXXXX',
-        'XXXXXXXXXX',
-        'X.XXXXXX.X',
-        'XX.XXXX.XX',
-        'XXXXXXXXXX',
-        '.XXXXXXXX.',
-        '..XXXXXX..',
-    ],
-    'exposition' => [
-        'XXXXXXXXXX',
-        'X........X',
-        'X.XX.....X',
-        'X........X',
-        'X........X',
-        'X....X...X',
-        'X...XXX..X',
-        'X..XXXXX.X',
-        'X.XXXXXXXX',
-        'XXXXXXXXXX',
-    ],
-];
-
-function render_pixel_icon(string $id, array $bitmap): string
-{
-    $rects = '';
-    foreach ($bitmap as $row => $line) {
-        $cols = str_split($line);
-        foreach ($cols as $col => $ch) {
-            if ($ch === 'X') {
-                $rects .= "<rect x=\"$col\" y=\"$row\" width=\"1\" height=\"1\"/>";
-            }
-        }
-    }
-    return "<g id=\"icon-$id\" fill=\"currentColor\">$rects</g>";
-}
 
 function json_file_read(string $path)
 {
@@ -716,8 +600,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   .legend .item-action { padding: 3px 12px; color: #0B0B0E; background: #E8C468; border-color: #E8C468; font-weight: 600; }
   .legend .item-action:hover { background: #C1694F; border-color: #C1694F; color: #fff; }
   .legend .sep { width: 1px; align-self: stretch; background: #34322C; margin: 0 4px; }
-  .legend .chip { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .legend .chip svg { width: 11px; height: 11px; stroke: #fff; }
+  .legend .chip { width: 18px; height: 18px; border-radius: 50%; flex: none; display: block; }
   .panel-bg { background: #0B0B0E; }
   .site-footer { text-align: center; padding: 16px 22px 28px; color: #8C8577; font-size: 0.78rem; border-top: 1px solid #262521; }
   .site-footer a { color: #B7B2A8; }
@@ -726,8 +609,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   .panel h2 { font-size: 1rem; margin: 26px 0 12px; font-weight: 600; color: #F4F1EB; }
   .panel .empty { color: #B7B2A8; }
   .card { background: #fff; border: 1px solid #E7E1D8; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; }
-  .card .chip { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
-  .card .chip svg { width: 13px; height: 13px; stroke: #fff; }
+  .card .chip { width: 24px; height: 24px; border-radius: 50%; flex: none; display: block; }
   .card .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .04em; color: #8C8577; margin-bottom: 3px; }
   .card .title { font-weight: 600; margin-bottom: 2px; }
   .card .meta { font-size: 0.85rem; color: #6B6560; margin-bottom: 6px; }
@@ -744,13 +626,12 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   .popup-title { font-weight: 600; margin-bottom: 4px; }
   .popup-title .featured-tag { display: inline-block; margin-left: 6px; font-size: 0.7rem; font-weight: 600; color: #B97A1D; }
   .popup-meta { font-size: 0.82rem; color: #6B6560; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-  .popup-meta .chip-sm { width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .popup-meta .chip-sm svg { width: 9px; height: 9px; stroke: #fff; }
+  .popup-meta .chip-sm { width: 16px; height: 16px; border-radius: 50%; flex: none; display: block; }
   /* Base marker size is 1.5x the original 26px chip (=39px); "featured"
      events (per the AI's judgement of cultural significance) get a
      further bump plus a gold ring and star badge so they stand out. */
   .marker-chip { border-radius: 50% 50% 50% 4px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.35); transform: rotate(45deg); position: relative; }
-  .marker-chip svg { transform: rotate(-45deg); }
+  .marker-chip img { transform: rotate(-45deg); border-radius: 50%; }
   .marker-chip.is-featured { box-shadow: 0 0 0 2px #E8C468, 0 2px 6px rgba(0,0,0,.4); }
   .marker-star { position: absolute; top: -5px; right: -5px; transform: rotate(-45deg); background: #E8C468; color: #2B2E33; border-radius: 50%; width: 12px; height: 12px; font-size: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
   .marker-count { position: absolute; bottom: -4px; right: -4px; transform: rotate(-45deg); background: #2B2E33; color: #fff; border-radius: 50%; min-width: 13px; height: 13px; padding: 0 2px; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
@@ -759,17 +640,6 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
 </head>
 <body>
 
-<!-- Icon sprite: the graphic charter — one shared 24x24 stroke grammar,
-     reused everywhere via <use>. Colours live per-category in PHP/JS, not
-     baked into the icons, so the same shapes work on any chip colour. -->
-<svg style="display:none" aria-hidden="true">
-  <defs>
-<?php foreach (PIXEL_ICONS as $iconId => $bitmap): ?>
-    <?= render_pixel_icon($iconId, $bitmap) ?>
-
-<?php endforeach; ?>
-  </defs>
-</svg>
 
 <div class="hero">
   <canvas id="art-hero" aria-hidden="true"></canvas>
@@ -787,7 +657,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
 <div class="legend" id="legend">
 <?php foreach (CATEGORIES as $key => $cat): ?>
   <button type="button" class="item" data-category="<?= $key ?>" aria-pressed="true">
-    <span class="chip" style="background:<?= $cat['color'] ?>"><svg viewBox="0 0 10 10" shape-rendering="crispEdges"><use href="#icon-<?= $cat['icon'] ?>"/></svg></span>
+    <img class="chip" src="/art-actu-logos/<?= $cat['icon'] ?>.png" alt="" width="18" height="18">
     <?= htmlspecialchars($cat['label']) ?>
   </button>
 <?php endforeach; ?>
@@ -805,7 +675,7 @@ $categoriesJson = json_encode(CATEGORIES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPE
   <h2>Non localisées sur la carte</h2>
   <?php foreach ($unlocatedList as $e): $cat = CATEGORIES[$e['category']] ?? CATEGORIES[DEFAULT_CATEGORY]; ?>
     <div class="card" data-category="<?= htmlspecialchars($e['category']) ?>">
-      <span class="chip" style="background:<?= $cat['color'] ?>"><svg viewBox="0 0 10 10" shape-rendering="crispEdges"><use href="#icon-<?= $cat['icon'] ?>"/></svg></span>
+      <img class="chip" src="/art-actu-logos/<?= $cat['icon'] ?>.png" alt="" width="24" height="24">
       <div>
         <div class="cat"><?= htmlspecialchars($cat['label']) ?></div>
         <div class="title"><?= htmlspecialchars($e['title']) ?><?php if (!empty($e['featured'])): ?> <span class="featured-tag">★ Mis en avant</span><?php endif; ?></div>
@@ -848,12 +718,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 function chipIcon(cat, opts) {
   opts = opts || {};
   const size = opts.featured ? 30 : 24;
-  const iconSize = Math.round(size * 0.54);
-  const svg = '<svg viewBox="0 0 10 10" shape-rendering="crispEdges" style="width:' + iconSize + 'px;height:' + iconSize + 'px"><use href="#icon-' + cat.icon + '"/></svg>';
+  const iconSize = Math.round(size * 0.7);
+  const img = '<img src="/art-actu-logos/' + cat.icon + '.png" alt="" style="width:' + iconSize + 'px;height:' + iconSize + 'px">';
   const star = opts.featured ? '<span class="marker-star">★</span>' : '';
   const count = opts.count > 1 ? '<span class="marker-count">' + opts.count + '</span>' : '';
   return L.divIcon({
-    html: '<div class="marker-chip' + (opts.featured ? ' is-featured' : '') + '" style="width:' + size + 'px;height:' + size + 'px;background:' + cat.color + '">' + svg + star + count + '</div>',
+    html: '<div class="marker-chip' + (opts.featured ? ' is-featured' : '') + '" style="width:' + size + 'px;height:' + size + 'px;background:' + cat.color + '">' + img + star + count + '</div>',
     className: '',
     iconSize: [size, size],
     iconAnchor: [size / 2, size - 2],
@@ -888,7 +758,7 @@ Object.keys(groups).forEach(function (gkey) {
     const cat = CATEGORIES[e.category] || CATEGORIES['exposition'];
     const linkHtml = e.link ? '<a href="' + e.link + '" target="_blank" rel="noopener">Voir la source →</a>' : '';
     const descHtml = e.description ? '<div>' + e.description + '</div>' : '';
-    const chipSm = '<span class="chip-sm" style="background:' + cat.color + '"><svg viewBox="0 0 10 10" shape-rendering="crispEdges"><use href="#icon-' + cat.icon + '"/></svg></span>';
+    const chipSm = '<img class="chip-sm" src="/art-actu-logos/' + cat.icon + '.png" alt="" width="16" height="16">';
     const featuredTag = e.featured ? '<span class="featured-tag">★ Mis en avant</span>' : '';
     return '<div class="popup-entry">' +
       '<div class="popup-title">' + e.title + featuredTag + '</div>' +
