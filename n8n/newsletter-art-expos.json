@@ -1,0 +1,426 @@
+{
+  "name": "Newsletter Art & Expos - Rennes & Ille-et-Vilaine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 6"
+            }
+          ]
+        }
+      },
+      "id": "trigger-1",
+      "name": "Chaque samedi 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = $now.toFormat('dd/MM/yyyy');\nconst rawSites = ($input.first().json.data ?? $input.first().json ?? '').toString();\nconst sites = rawSites.split(/\\r?\\n/)\n  .map(function (l) { return l.trim(); })\n  .filter(function (l) { return l && !l.startsWith('#'); });\nconst sitesLine = sites.length\n  ? ' Cherche en priorite sur les sites suivants (en plus de toute autre source pertinente si besoin) : ' + sites.join(', ') + '.'\n  : '';\n\nconst prompt = 'Nous sommes le ' + today + '. Tu es un redacteur culturel. Utilise la recherche web pour trouver les expositions et evenements lies a l\\'art (expositions, vernissages, biennales, galeries, musees, centres d\\'art) qui, a la date d\\'aujourd\\'hui, sont soit deja accessibles soit prevus dans les prochaines semaines, a Rennes et dans le departement Ille-et-Vilaine (35), en Bretagne, France.' + sitesLine + ' Pour chaque evenement distinct que tu retiens, ecris un paragraphe separe donnant : le nom de l\\'evenement, le nom exact du lieu, la ville, l\\'adresse si tu la connais, les dates precises, une description en 1-2 phrases, et cite la page web qui te sert de source pour cette information. Important concernant les sources : pour chaque evenement, cherche et cite en priorite la page dediee a cet evenement precis (la fiche de l\\'exposition sur le site du lieu, un article qui parle specifiquement de cet evenement) plutot que la page d\\'accueil du site ou une simple liste generale d\\'agenda ; si necessaire, fais une recherche additionnelle avec le nom de l\\'evenement et le nom du lieu pour trouver cette page dediee. Utilise la page d\\'accueil ou une liste d\\'agenda uniquement en dernier recours, si vraiment aucune page dediee n\\'existe. Verifie via la recherche web que chaque evenement est reel et que ses dates sont a jour. Si tu ne trouves aucune information fiable, dis-le simplement. N\\'invente jamais un evenement.';\n\nconst body = {\n  model: 'gpt-4.1',\n  tools: [{ type: 'web_search' }],\n  input: prompt,\n};\n\nreturn [{ json: { body } }];"
+      },
+      "id": "code-prepare-search-1",
+      "name": "Preparer recherche web",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "openai-search-1",
+      "name": "Rechercher expositions (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        304
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "NJfF5hjqFfDerwuU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst output = response.output || [];\nlet text = '';\nlet annotations = [];\nfor (const item of output) {\n  if (item.type === 'message' && Array.isArray(item.content)) {\n    for (const c of item.content) {\n      if (c.type === 'output_text') {\n        text = c.text || '';\n        annotations = c.annotations || [];\n      }\n    }\n  }\n}\n\nconst sorted = annotations.filter(a => a.type === 'url_citation' && a.url).sort((a, b) => b.end_index - a.end_index);\nfor (const a of sorted) {\n  const insert = ' (Source: ' + a.url + ')';\n  text = text.slice(0, a.end_index) + insert + text.slice(a.end_index);\n}\n\nreturn [{ json: { annotated_text: text } }];"
+      },
+      "id": "code-insert-citations-1",
+      "name": "Inserer citations dans le texte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.annotated_text || '';\nconst prompt = 'Voici un texte decrivant des expositions et evenements d\\'art a Rennes et en Ille-et-Vilaine. Des mentions \"(Source: URL)\" indiquent l\\'URL de la page web la plus proche pour l\\'information qui precede. Extrait chaque evenement distinct decrit dans ce texte sous forme structuree selon le schema fourni. Pour le champ link, reprends telle quelle l\\'URL \"(Source: ...)\" la plus proche et la plus pertinente pour cet evenement precis ; laisse une chaine vide si aucune URL claire n\\'est associee a cet evenement. Choisis la categorie la plus precise possible ; n\\'utilise exposition que si aucune autre categorie ne convient mieux. Determine le statut en_cours ou a_venir a partir des dates mentionnees dans le texte. Mets featured a true uniquement pour les evenements manifestement majeurs : grande institution (musee, Frac, centre d\\'art reconnu), retrospective d\\'envergure, biennale/triennale, ou evenement decrit dans le texte comme un temps fort ; mets featured a false pour tout le reste, y compris en cas de doute. Ne modifie aucun fait et n\\'ajoute aucun evenement qui ne serait pas deja present dans le texte.\\n\\nTexte:\\n' + text;\n\nconst body = {\n  model: 'gpt-4.1',\n  input: prompt,\n  text: {\n    format: {\n      type: 'json_schema',\n      name: 'exhibitions_list',\n      strict: true,\n      schema: {\"type\": \"object\", \"properties\": {\"exhibitions\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"title\": {\"type\": \"string\"}, \"category\": {\"type\": \"string\", \"enum\": [\"peinture\", \"sculpture\", \"photographie\", \"arts_numeriques\", \"street_art\", \"design\", \"spectacle_vivant\", \"exposition\"]}, \"venue\": {\"type\": \"string\"}, \"city\": {\"type\": \"string\"}, \"address\": {\"type\": \"string\"}, \"start_date\": {\"type\": \"string\"}, \"end_date\": {\"type\": \"string\"}, \"dates_label\": {\"type\": \"string\"}, \"status\": {\"type\": \"string\", \"enum\": [\"en_cours\", \"a_venir\"]}, \"description\": {\"type\": \"string\"}, \"link\": {\"type\": \"string\"}, \"featured\": {\"type\": \"boolean\"}}, \"required\": [\"title\", \"category\", \"venue\", \"city\", \"address\", \"start_date\", \"end_date\", \"dates_label\", \"status\", \"description\", \"link\", \"featured\"], \"additionalProperties\": false}}}, \"required\": [\"exhibitions\"], \"additionalProperties\": false}\n    }\n  }\n};\n\nreturn [{ json: { body } }];"
+      },
+      "id": "code-prepare-extract-1",
+      "name": "Preparer extraction structuree",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "openai-extract-1",
+      "name": "Extraire structure (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        304
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "NJfF5hjqFfDerwuU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet text = '';\nconst output = response.output || [];\nfor (const item of output) {\n  if (item.type === 'message' && Array.isArray(item.content)) {\n    for (const c of item.content) {\n      if (c.type === 'output_text' && c.text) text += c.text;\n    }\n  }\n}\nif (!text && response.output_text) text = response.output_text;\n\ntext = text.trim();\nif (text.startsWith('```')) {\n  text = text.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n}\n\nlet parsed = {};\ntry {\n  parsed = JSON.parse(text);\n} catch (e) {\n  parsed = {};\n}\nlet items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.exhibitions) ? parsed.exhibitions : []);\n\n// Rejects homepage / generic listing-page links (e.g. leschampslibres.fr/\n// or .../au-programme/recherche) — a link that just dumps the visitor on\n// a search page instead of the specific event is worse than no link at\n// all, so treat those the same as an invalid link (empty string).\n// Deliberately avoids the URL constructor: n8n's Code node sandbox does\n// not reliably expose it, which previously made every single link\n// silently fail the try/catch and get rejected regardless of content.\nfunction isLowValueLink(link) {\n  const noFragment = link.split('#')[0];\n  const noQuery = noFragment.split('?')[0];\n  const afterProtocol = noQuery.replace(/^https?:\\/\\//i, '');\n  const slashIdx = afterProtocol.indexOf('/');\n  const path = slashIdx === -1 ? '' : afterProtocol.slice(slashIdx);\n  const trimmed = path.replace(/\\/+$/, '');\n  if (trimmed === '') return true;\n  const segments = trimmed.split('/').filter(Boolean);\n  const last = (segments[segments.length - 1] || '').toLowerCase();\n  const generic = ['recherche','search','agenda','actualites','actualite','programme','expositions','exposition','evenements','evenement','events','event','news','accueil','home','exhibitions','exhibition','activites','activite'];\n  if (generic.includes(last)) return true;\n  if (segments.length === 1 && /^[a-z]{2}$/.test(last)) return true;\n  return false;\n}\n\nconst validCategories = ['peinture','sculpture','photographie','arts_numeriques','street_art','design','spectacle_vivant','exposition'];\nconst cleaned = items\n  .filter(it => it && it.title && it.venue)\n  .map(it => {\n    const link = (typeof it.link === 'string' && /^https?:\\/\\//i.test(it.link) && !isLowValueLink(it.link)) ? it.link : '';\n    return {\n      title: String(it.title),\n      category: validCategories.includes(it.category) ? it.category : 'exposition',\n      venue: String(it.venue),\n      city: String(it.city || 'Rennes'),\n      address: String(it.address || ''),\n      start_date: String(it.start_date || ''),\n      end_date: String(it.end_date || ''),\n      dates_label: String(it.dates_label || ''),\n      status: (it.status === 'en_cours' || it.status === 'a_venir') ? it.status : '',\n      description: String(it.description || ''),\n      link: link,\n      featured: it.featured === true,\n    };\n  })\n  // User preference: an event with no specific/direct source page is\n  // dropped entirely rather than shown with an empty 'more info' link.\n  .filter(it => it.link);\n\nreturn [{ json: { exhibitions: cleaned } }];"
+      },
+      "id": "code-extract-1",
+      "name": "Extraire JSON expositions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CATEGORIES = {\n  peinture: { label: 'Peinture', icon: 'peinture', color: '#C1694F' },\n  sculpture: { label: 'Sculpture', icon: 'sculpture', color: '#8C8577' },\n  photographie: { label: 'Photographie', icon: 'photographie', color: '#5D80A3' },\n  arts_numeriques: { label: 'Arts numeriques', icon: 'arts_numeriques', color: '#5F8B7A' },\n  street_art: { label: 'Street art', icon: 'street_art', color: '#D3A048' },\n  design: { label: 'Design', icon: 'design', color: '#B97A94' },\n  spectacle_vivant: { label: 'Spectacle vivant', icon: 'spectacle_vivant', color: '#7C4A5B' },\n  exposition: { label: 'Exposition', icon: 'exposition', color: '#A38F76' },\n};\n\nconst exhibitions = $input.first().json.exhibitions || [];\nconst enCours = exhibitions.filter(e => e.status !== 'a_venir');\nconst aVenir = exhibitions.filter(e => e.status === 'a_venir');\n\nfunction esc(s) {\n  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n}\n\nfunction chip(cat) {\n  return '<img src=\"https://penloup.eu/art-actu-logos/' + cat.icon + '.png\" width=\"22\" height=\"22\" alt=\"\" style=\"display:inline-block;vertical-align:middle;border-radius:50%;\">';\n}\n\nfunction renderList(list) {\n  if (list.length === 0) return '<p style=\"font-family:Arial,sans-serif;color:#666;\">Rien de confirme pour cette periode.</p>';\n  return '<ul style=\"font-family:Arial,sans-serif;padding-left:20px;list-style:none;margin-left:0;\">' + list.map(e => {\n    const cat = CATEGORIES[e.category] || CATEGORIES.exposition;\n    const star = e.featured ? ' <span style=\"color:#B97A1D;\">★ Mis en avant</span>' : '';\n    return '<li style=\"margin-bottom:14px;\">'\n      + chip(cat) + ' <strong>' + esc(e.title) + '</strong>' + star + ' — ' + esc(e.venue) + ', ' + esc(e.city) + '<br>'\n      + '<span style=\"margin-left:30px;\">' + esc(e.dates_label) + '<br>'\n      + esc(e.description)\n      + (e.link ? ' <a href=\"' + e.link + '\">En savoir plus</a>' : '')\n      + '</span></li>';\n  }).join('') + '</ul>';\n}\n\nconst today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });\nconst legend = Object.values(CATEGORIES).map(c => chip(c) + ' ' + c.label).join(' &nbsp;&nbsp; ');\n\nconst html = '<h1 style=\"font-family:Arial,sans-serif;color:#2E2B27;\">Newsletter Art &amp; Expos - Rennes &amp; Ille-et-Vilaine - ' + today + '</h1>'\n  + '<p style=\"font-family:Arial,sans-serif;font-size:0.8em;line-height:2;\">' + legend + '</p>'\n  + '<p style=\"font-family:Arial,sans-serif;\"><a href=\"https://penloup.eu/art-actu.php\" style=\"display:inline-block;background:#2B2E33;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;\">Voir la carte interactive</a></p>'\n  + '<h2 style=\"font-family:Arial,sans-serif;color:#2E2B27;\">En ce moment</h2>' + renderList(enCours)\n  + '<h2 style=\"font-family:Arial,sans-serif;color:#2E2B27;\">A venir prochainement</h2>' + renderList(aVenir);\n\nreturn [{ json: { html, exhibitions } }];\n"
+      },
+      "id": "code-build-1",
+      "name": "Construire newsletter + payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://penloup.eu/art-actu.php",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ exhibitions: $json.exhibitions }) }}",
+        "options": {}
+      },
+      "id": "http-publish-1",
+      "name": "Publier sur la carte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "d02HdhzArArR4jXk",
+          "name": "Art Actu Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "david.legoupil@gmail.com, awenak@gmail.com",
+        "subject": "=Newsletter Art & Expos - Rennes & Ille-et-Vilaine - {{ $now.toFormat('dd/MM/yyyy') }}",
+        "message": "={{ $('Construire newsletter + payload').item.json.html }}",
+        "options": {},
+        "emailType": "html"
+      },
+      "id": "email-1",
+      "name": "Envoyer newsletter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1984,
+        304
+      ],
+      "webhookId": "eae66134-0e69-4ec8-9d9b-71bfdd3b5e2f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "KgiC73UlhLN3KX03",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://penloup.eu/art-actu-sites.txt",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "http-fetch-sites-1",
+      "name": "Lire liste de sites",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        992,
+        736
+      ],
+      "id": "febca863-ee30-4598-8da9-294520dbc1d2",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = $now.toFormat('dd/MM/yyyy');\nconst rawSites = ($('Lire liste de sites').item.json.data ?? $('Lire liste de sites').item.json ?? '').toString();\nconst sites = rawSites.split(/\\r?\\n/)\n  .map(function (l) { return l.trim(); })\n  .filter(function (l) { return l && !l.startsWith('#'); });\nconst sitesLine = sites.length\n  ? ' Voici une liste de sites qui peuvent etre utiles (en plus de toute autre source pertinente si besoin) : ' + sites.join(', ') + '.'\n  : '';\n\nconst prompt = 'Nous sommes le ' + today + '. Utilise la recherche web pour trouver specifiquement des evenements de STREET ART / ART URBAIN (murs peints, fresques murales, graffitis, interventions urbaines) qui, a la date d\\'aujourd\\'hui, sont soit deja visibles soit prevus dans les prochaines semaines, a Rennes et dans le departement Ille-et-Vilaine (35), en Bretagne, France. Ne cherche que du street art / art urbain, pas les autres formes d\\'art.' + sitesLine + ' Pour chaque evenement distinct que tu retiens, ecris un paragraphe separe donnant : le nom de l\\'evenement ou de la fresque, le nom exact du lieu ou l\\'adresse, la ville, les dates si connues, une description en 1-2 phrases, et cite la page web qui te sert de source. Cherche en priorite la page dediee a cet evenement plutot que la page d\\'accueil d\\'un site. Verifie que chaque evenement est reel. Si tu ne trouves vraiment aucune information fiable de street art, dis-le simplement plutot que d\\'inventer.';\n\nconst body = {\n  model: 'gpt-4.1',\n  tools: [{ type: 'web_search' }],\n  input: prompt,\n};\n\nreturn [{ json: { body } }];"
+      },
+      "id": "code-prepare-street-1",
+      "name": "Preparer recherche street art",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "openai-street-1",
+      "name": "Rechercher street art (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        460
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "NJfF5hjqFfDerwuU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst output = response.output || [];\nlet text = '';\nlet annotations = [];\nfor (const item of output) {\n  if (item.type === 'message' && Array.isArray(item.content)) {\n    for (const c of item.content) {\n      if (c.type === 'output_text') {\n        text = c.text || '';\n        annotations = c.annotations || [];\n      }\n    }\n  }\n}\n\nconst sorted = annotations.filter(a => a.type === 'url_citation' && a.url).sort((a, b) => b.end_index - a.end_index);\nfor (const a of sorted) {\n  const insert = ' (Source: ' + a.url + ')';\n  text = text.slice(0, a.end_index) + insert + text.slice(a.end_index);\n}\n\nconst previousText = $('Inserer citations dans le texte').item.json.annotated_text || '';\nconst combined = previousText + '\\n\\n--- Street art / art urbain ---\\n\\n' + text;\n\nreturn [{ json: { annotated_text: combined } }];"
+      },
+      "id": "code-insert-citations-street-1",
+      "name": "Fusionner recherches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Chaque samedi 9h": {
+      "main": [
+        [
+          {
+            "node": "Lire liste de sites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparer recherche web": {
+      "main": [
+        [
+          {
+            "node": "Rechercher expositions (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rechercher expositions (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Inserer citations dans le texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserer citations dans le texte": {
+      "main": [
+        [
+          {
+            "node": "Preparer recherche street art",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparer extraction structuree": {
+      "main": [
+        [
+          {
+            "node": "Extraire structure (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire structure (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Extraire JSON expositions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire JSON expositions": {
+      "main": [
+        [
+          {
+            "node": "Construire newsletter + payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construire newsletter + payload": {
+      "main": [
+        [
+          {
+            "node": "Publier sur la carte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publier sur la carte": {
+      "main": [
+        [
+          {
+            "node": "Envoyer newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire liste de sites": {
+      "main": [
+        [
+          {
+            "node": "Preparer recherche web",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparer recherche street art": {
+      "main": [
+        [
+          {
+            "node": "Rechercher street art (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rechercher street art (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Fusionner recherches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusionner recherches": {
+      "main": [
+        [
+          {
+            "node": "Preparer extraction structuree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

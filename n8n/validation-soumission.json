@@ -1,0 +1,91 @@
+{
+  "name": "Validation soumission Art & Expos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "art-actu-submission",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-submission-1",
+      "name": "Reception soumission",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "webhookId": "b6f0b6b0-1c1a-4e0a-9a1a-art-actu-submission",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "d02HdhzArArR4jXk",
+          "name": "Art Actu Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json.body;\nfunction esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\n\nconst rows = [\n  ['Categorie', d.category_label],\n  ['Lieu', d.venue],\n  ['Ville', d.city],\n  ['Adresse', d.address],\n  ['Dates', d.dates_label],\n  ['Statut', d.status_label],\n  ['Lien', d.link],\n  ['Description', d.description],\n  ['Propose par', (d.submitter_name || '') + (d.submitter_email ? ' <' + d.submitter_email + '>' : '')],\n].filter(function (r) { return r[1]; });\n\nconst detailsHtml = rows.map(function (r) {\n  return '<tr><td style=\"padding:4px 14px 4px 0;color:#8C8577;font-family:Arial,sans-serif;font-size:0.85em;vertical-align:top;white-space:nowrap;\">' + esc(r[0]) + '</td>'\n    + '<td style=\"padding:4px 0;font-family:Arial,sans-serif;font-size:0.92em;\">' + esc(r[1]) + '</td></tr>';\n}).join('');\n\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:560px;\">'\n  + '<h2 style=\"color:#2E2B27;\">Nouvelle proposition d\\'evenement</h2>'\n  + '<p style=\"font-size:1.05em;font-weight:bold;\">' + esc(d.title) + '</p>'\n  + '<table cellpadding=\"0\" cellspacing=\"0\">' + detailsHtml + '</table>'\n  + '<p style=\"margin-top:22px;\">'\n  + '<a href=\"' + d.approve_url + '\" style=\"display:inline-block;background:#5F8B7A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;margin-right:10px;\">Valider et publier</a>'\n  + '<a href=\"' + d.reject_url + '\" style=\"display:inline-block;background:#8C8577;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;\">Rejeter</a>'\n  + '</p>'\n  + '<p style=\"font-size:0.8em;color:#8C8577;margin-top:18px;\">Ces liens ouvrent une page de confirmation avant toute action (pas d\\'action directe au clic, au cas ou un antivirus de messagerie pre-visite les liens).</p>'\n  + '</div>';\n\nreturn [{ json: { html: html, subject: 'Nouvel evenement a valider : ' + d.title, to: d.to_email } }];\n"
+      },
+      "id": "code-build-mail-1",
+      "name": "Construire email validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {},
+        "emailType": "html"
+      },
+      "id": "email-validation-1",
+      "name": "Envoyer email validation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        840,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "KgiC73UlhLN3KX03",
+          "name": "Gmail account"
+        }
+      },
+      "webhookId": "8526b216-ceff-4c04-88a8-a0aa5bf0294f"
+    }
+  ],
+  "connections": {
+    "Reception soumission": {
+      "main": [
+        [
+          {
+            "node": "Construire email validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construire email validation": {
+      "main": [
+        [
+          {
+            "node": "Envoyer email validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
